@@ -1,0 +1,58 @@
+Script Jenkins migliorato per avvio automatico servizio:
+
+echo "Jenkins Auto-Deploy Avviato"
+
+# Crea directory
+sudo mkdir -p /opt/omnia
+
+# Copia JAR
+sudo cp target/raspberry-controller-1.0.0.jar /opt/omnia/
+
+echo "Creazione servizio systemd"
+sudo tee /etc/systemd/system/omnia-java-led.service > /dev/null <<END
+[Unit]
+Description=Omnia LED Controller Java Backend
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/omnia
+ExecStart=/usr/bin/java -jar raspberry-controller-1.0.0.jar
+Restart=always
+RestartSec=10
+Environment=SERVER_PORT=3000
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+END
+
+# Ricarica servizi
+sudo systemctl daemon-reload
+sudo systemctl enable omnia-java-led.service
+
+# Avvia/riavvia il servizio
+sudo systemctl restart omnia-java-led.service
+
+# Aspetta avvio
+sleep 8
+
+# Verifica che sia attivo
+if sudo systemctl is-active --quiet omnia-java-led.service; then
+    echo "Servizio attivo con successo"
+    # Test API
+    if curl -f http://localhost:3000/ >/dev/null 2>&1; then
+        echo "API risponde correttamente"
+    else
+        echo "API non risponde ancora (normale nei primi secondi)"
+    fi
+else
+    echo "Errore: servizio non attivo"
+    sudo systemctl status omnia-java-led.service
+    exit 1
+fi
+
+echo "Deploy completato con successo"
