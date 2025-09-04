@@ -9,14 +9,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/led")
 @CrossOrigin(origins = "*")
 public class LedController {
 
     @Autowired
     private GpioService gpioService;
 
-    @PostMapping("/toggle")
+    @GetMapping("/")
+    public ResponseEntity<Map<String, Object>> getServerStatus() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Server LED Strip attivo");
+        response.put("ledState", gpioService.isLedOn());
+        response.put("service", "Java Spring Boot + Pi4J");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/api/led/toggle")
     public ResponseEntity<Map<String, Object>> toggleLed() {
         try {
             boolean newState = gpioService.toggleLed();
@@ -31,7 +39,7 @@ public class LedController {
         }
     }
 
-    @GetMapping("/status")
+    @GetMapping("/api/led/status")
     public ResponseEntity<Map<String, Object>> getLedStatus() {
         try {
             boolean isOn = gpioService.isLedOn();
@@ -46,7 +54,7 @@ public class LedController {
         }
     }
 
-    @PostMapping("/on")
+    @PostMapping("/api/led/on")
     public ResponseEntity<Map<String, Object>> turnOnLed() {
         try {
             gpioService.turnOnLed();
@@ -61,7 +69,7 @@ public class LedController {
         }
     }
 
-    @PostMapping("/off")
+    @PostMapping("/api/led/off")
     public ResponseEntity<Map<String, Object>> turnOffLed() {
         try {
             gpioService.turnOffLed();
