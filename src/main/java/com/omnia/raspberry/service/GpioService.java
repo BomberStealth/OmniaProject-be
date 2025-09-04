@@ -22,6 +22,7 @@ public class GpioService {
     @PostConstruct
     public void initialize() {
         try {
+            //Prova
             // Inizializza Pi4J context
             pi4j = Pi4J.newAutoContext();
             
