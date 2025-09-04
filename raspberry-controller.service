@@ -1,0 +1,23 @@
+[Unit]
+Description=Raspberry Pi Controller Backend
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/OmniaProject-be
+ExecStart=/usr/bin/java -jar /home/pi/OmniaProject-be/target/raspberry-controller-1.0.0.jar
+Restart=always
+RestartSec=10
+
+# Variabili d'ambiente
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-armhf
+Environment=SPRING_PROFILES_ACTIVE=production
+
+# Log
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=raspberry-controller
+
+[Install]
+WantedBy=multi-user.target
