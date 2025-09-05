@@ -38,12 +38,6 @@
             <artifactId>jakarta.annotation-api</artifactId>
         </dependency>
 
-        <!-- Jakarta Annotation API (for @PostConstruct, @PreDestroy) -->
-        <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
-        </dependency>
-
         <!-- Pi4J per GPIO control CIAO-->
         <dependency>
             <groupId>com.pi4j</groupId>
