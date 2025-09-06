@@ -1,59 +1,55 @@
 #!/bin/bash
 
-# Script di deployment automatico per Raspberry Pi
-# Questo script deve essere eseguito sul Raspberry Pi
+# Script per deploy automatico del backend su Raspberry Pi
+# Da eseguire dal Raspberry Pi nella directory OmniaProject-be
 
-PROJECT_DIR="/home/pi/OmniaProject-be"
-SERVICE_NAME="raspberry-controller"
+echo "🚀 OMNIA PROJECT - Deploy Backend Definitivo"
+echo "============================================="
 
-echo "=== Avvio deployment automatico ==="
+# Ferma il container di test esistente
+echo "⏹️  Fermando container di test..."
+sudo docker stop omniaproject-be || echo "Container non trovato"
+sudo docker rm omniaproject-be || echo "Container non trovato"
 
-# Naviga nella directory del progetto
-cd $PROJECT_DIR || exit 1
+# Rimuovi immagine precedente
+echo "🗑️  Rimuovendo immagine precedente..."
+sudo docker rmi omnia-backend:latest || echo "Immagine non trovata"
 
-# Esegui git pull per ottenere le ultime modifiche
-echo "Eseguo git pull..."
-git pull origin main
+# Builda la nuova immagine
+echo "🔨 Buildando nuova immagine Docker..."
+sudo docker build -t omnia-backend:latest .
 
-# Controlla se ci sono stati cambiamenti
+if [ $? -ne 0 ]; then
+    echo "❌ Errore durante la build dell'immagine"
+    exit 1
+fi
+
+# Avvia il nuovo container con privilegi GPIO
+echo "🔧 Avviando nuovo container..."
+sudo docker run -d \
+  --name omniaproject-be \
+  --restart unless-stopped \
+  --privileged \
+  -p 3000:3000 \
+  -v /dev:/dev \
+  omnia-backend:latest
+
 if [ $? -eq 0 ]; then
-    echo "Git pull completato con successo"
+    echo "✅ Deploy completato con successo!"
+    echo "🌐 Backend disponibile su: http://192.168.1.100:3000"
+    echo "🔗 API LED: http://192.168.1.100:3000/api/led/toggle"
+    
+    # Attendi qualche secondo per l'avvio
+    sleep 5
+    
+    # Testa il servizio
+    echo "🧪 Test del servizio..."
+    curl -s http://localhost:3000/ | grep -q "Server LED Strip" && echo "✅ Servizio risponde correttamente" || echo "❌ Servizio non risponde"
+    
+    # Mostra i log
+    echo "📋 Log container:"
+    sudo docker logs omniaproject-be --tail 20
 else
-    echo "Errore durante git pull"
+    echo "❌ Errore durante l'avvio del container"
     exit 1
 fi
-
-# Compila il progetto con Maven
-echo "Compilazione del progetto..."
-./mvnw clean package -DskipTests
-
-if [ $? -eq 0 ]; then
-    echo "Compilazione completata con successo"
-else
-    echo "Errore durante la compilazione"
-    exit 1
-fi
-
-# Ferma il servizio esistente (se in esecuzione)
-echo "Arresto servizio esistente..."
-sudo systemctl stop $SERVICE_NAME 2>/dev/null || echo "Servizio non in esecuzione"
-
-# Aspetta un momento
-sleep 2
-
-# Avvia il nuovo servizio
-echo "Avvio nuovo servizio..."
-sudo systemctl start $SERVICE_NAME
-
-# Controlla lo stato del servizio
-sleep 3
-if sudo systemctl is-active --quiet $SERVICE_NAME; then
-    echo "✅ Deployment completato con successo!"
-    echo "Servizio $SERVICE_NAME è in esecuzione"
-else
-    echo "❌ Errore: il servizio non si è avviato correttamente"
-    sudo systemctl status $SERVICE_NAME
-    exit 1
-fi
-
-echo "=== Deployment completato ==="
