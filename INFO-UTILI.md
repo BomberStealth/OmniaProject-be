@@ -1,6 +1,33 @@
-# 📋 OMNIA PROJECT - INFO UTILI
+# 📋 OMNIA PROJECT - GUIDA COMPLETA
 
-Guida completa per gestire il sistema OMNIA su Raspberry Pi.
+Sistema completo per controllo LED Raspberry Pi con auto-deploy da VSCode.
+
+## 🎯 **RIAVVIO RAPIDO DOPO SPEGNIMENTO**
+
+**Se spegni e riaccendi il Raspberry Pi, tutto dovrebbe ripartire automaticamente!**
+
+### **Verifica Sistema dopo Riavvio:**
+```bash
+# 1. Connettiti via SSH
+ssh omniaproject@192.168.1.100
+# Password: Dcd776c2
+
+# 2. Controlla che i servizi siano attivi
+sudo docker ps
+# Dovresti vedere: portainer + omniaproject-be-omnia-backend
+
+# 3. Se i container non sono attivi, riavviali:
+sudo docker start portainer
+sudo docker start omniaproject-be  # (o il nome del container backend)
+
+# 4. Testa che il LED funzioni
+curl -X POST http://localhost:3000/api/led/toggle
+```
+
+### **Servizi Configurati per Auto-Start:**
+✅ **Docker** - Si avvia automaticamente  
+✅ **Portainer** - Container con `--restart=always`  
+✅ **Backend Stack** - Gestito da Portainer con restart policy  
 
 ## 🚀 **SETUP COMPLETO DA ZERO**
 
@@ -25,7 +52,7 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker omniaproject
 
-# Installa Portainer
+# Installa Portainer con auto-restart
 sudo docker run -d -p 9000:9000 --name=portainer --restart=always \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v portainer_data:/data \
@@ -35,16 +62,17 @@ sudo docker run -d -p 9000:9000 --name=portainer --restart=always \
 sudo apt install gpiod git -y
 ```
 
-### 3. **Deploy Backend OMNIA**
-```bash
-# Clona repository GitHub esistente
-git clone https://github.com/BomberStealth/OmniaProject-be.git
-cd OmniaProject-be
-
-# Esegui deploy automatico
-chmod +x deploy.sh
-./deploy.sh
-```
+### 3. **Deploy Backend OMNIA con Portainer**
+1. **Vai su**: http://192.168.1.100:9000
+2. **Login** e vai su **Stacks** → **Add Stack**
+3. **Configurazione:**
+   - **Name**: `omnia-backend`
+   - **Build method**: Repository
+   - **Repository URL**: `https://github.com/BomberStealth/OmniaProject-be`
+   - **Repository reference**: `refs/heads/main`
+   - **Compose path**: `docker-compose.yml`
+   - **GitOps updates**: ✅ Enable (ogni 120 secondi)
+4. **Deploy the stack**
 
 ## 🔄 **RIAVVIO DOPO SPEGNIMENTO**
 
@@ -120,48 +148,34 @@ sudo docker rm omniaproject-be
 ./deploy.sh
 ```
 
-## 🔄 **DEPLOY AUTOMATICO CON GIT**
+## 🔄 **WORKFLOW COMPLETO - AUTO-DEPLOY ATTIVO!**
 
-### **Setup Git Hooks (Da Fare)**
+### **Come Modificare il Sistema da VSCode:**
 
-Per avere deploy automatico quando fai push:
-
-#### **Sul PC (Repository Locale)**
+#### **1. Sul PC (VSCode):**
 ```bash
-# Assicurati che il repository abbia origin configurato
-git remote -v
+# Modifica i file nel progetto OmniaProject-be
+# Es: src/main/java/com/omnia/raspberry/service/GpioService.java
 
-# Push delle modifiche
-git add .
-git commit -m "Aggiornamenti backend"
-git push origin main
+# In VSCode:
+# 1. Vai su Source Control (Ctrl+Shift+G)
+# 2. Scrivi commit message
+# 3. Clicca "Commit & Push"
 ```
 
-#### **Sul Raspberry Pi (Setup Hook)**
+#### **2. Auto-Deploy (Portainer fa tutto):**
+- ✅ **Portainer** rileva modifiche GitHub ogni 2 minuti
+- ✅ **Pull** automatico del codice aggiornato  
+- ✅ **Build** automatica nuova immagine Docker
+- ✅ **Deploy** automatico container aggiornato
+- ✅ **Restart** automatico servizi
+
+#### **3. Verifica modifiche:**
 ```bash
-# Naviga nella directory del progetto
-cd ~/OmniaProject-be
-
-# Crea script di pull automatico
-cat > git-pull-deploy.sh << 'EOF'
-#!/bin/bash
-echo "🔄 Git Pull e Deploy Automatico"
-cd ~/OmniaProject-be
-git pull origin main
-./deploy.sh
-EOF
-
-chmod +x git-pull-deploy.sh
-
-# Configura cron per controllo ogni 5 minuti (opzionale)
-crontab -e
-# Aggiungi: */5 * * * * /home/omniaproject/OmniaProject-be/git-pull-deploy.sh >> /tmp/git-pull.log 2>&1
+# Dopo 2-3 minuti dal push:
+curl http://192.168.1.100:3000/
+curl -X POST http://192.168.1.100:3000/api/led/toggle
 ```
-
-#### **Setup GitHub Webhook (Avanzato)**
-1. Installa webhook receiver sul Raspberry Pi
-2. Configura endpoint su GitHub
-3. Deploy automatico ad ogni push
 
 ## 🌐 **ACCESSI E INDIRIZZI**
 
@@ -173,16 +187,36 @@ crontab -e
 ### **Servizi Web**
 - **Backend API**: http://192.168.1.100:3000
 - **Portainer GUI**: http://192.168.1.100:9000
-- **Health Check**: http://192.168.1.100:3000/api/led/status
+- **Frontend React**: http://localhost:5173 (avviato da PC)
 
-### **Endpoint API**
+### **Frontend React - Avvio:**
+```bash
+# Sul PC Windows
+cd "C:\Users\edoar\Desktop\Omnia Project\OmniaProject"
+npm run dev
+# Apri browser su: http://localhost:5173
+```
+
+### **Endpoint API Backend**
 | Endpoint | Metodo | Descrizione |
 |----------|--------|-------------|
-| `/` | GET | Status del server |
+| `/` | GET | Status del server + stato LED |
 | `/api/led/status` | GET | Stato attuale LED |
-| `/api/led/toggle` | POST | Cambia stato LED |
+| `/api/led/toggle` | POST | Cambia stato LED (ON/OFF) |
 | `/api/led/on` | POST | Accendi LED |
 | `/api/led/off` | POST | Spegni LED |
+
+### **Test API Rapidi**
+```bash
+# Status completo sistema
+curl http://192.168.1.100:3000/
+
+# Toggle LED fisico
+curl -X POST http://192.168.1.100:3000/api/led/toggle
+
+# Solo stato LED
+curl http://192.168.1.100:3000/api/led/status
+```
 
 ## 📁 **STRUTTURA FILE IMPORTANTI**
 
@@ -235,6 +269,61 @@ In caso di problemi gravi:
 3. Rifai il deploy completo con `./deploy.sh`
 4. Se necessario, ricomincia da "Setup Completo da Zero"
 
+## 🎯 **RISOLUZIONE PROBLEMI RAPIDI**
+
+### **LED Non Risponde:**
+```bash
+# Test GPIO manuale
+sudo gpioset gpiochip0 18=1  # Accendi
+sudo gpioset gpiochip0 18=0  # Spegni
+
+# Se GPIO funziona ma API no:
+sudo docker restart omniaproject-be
+curl -X POST http://localhost:3000/api/led/toggle
+```
+
+### **Container Non Si Avvia:**
+```bash
+# Controlla log errori
+sudo docker logs omniaproject-be
+
+# Ricostruisci se necessario
+cd ~/OmniaProject-be
+git pull origin main
+sudo docker compose build --no-cache
+sudo docker compose up -d
+```
+
+### **Frontend Non Vede Backend:**
+- ✅ Verifica IP in `ledService.js`: `192.168.1.100:3000`
+- ✅ Testa backend: `curl http://192.168.1.100:3000/`
+- ✅ Riavvia frontend: `npm run dev`
+
+### **Auto-Deploy Non Funziona:**
+1. **Verifica Portainer Stack**: http://192.168.1.100:9000/#!/stacks
+2. **Controlla GitOps**: deve essere abilitato ogni 120 secondi
+3. **Test manuale**: `git pull origin main` + `sudo docker compose up -d`
+
+---
+
+## 📚 **GUIDA RAPIDA - 3 STEP:**
+
+### **🚀 Per Iniziare:**
+1. **SSH**: `ssh omniaproject@192.168.1.100` (password: Dcd776c2)
+2. **Frontend**: `cd "C:\Users\edoar\Desktop\Omnia Project\OmniaProject" && npm run dev`
+3. **Browser**: http://localhost:5173 → Clicca bottone LED
+
+### **⚡ Per Modificare:**
+1. **VSCode**: Modifica file in `OmniaProject-be`
+2. **Source Control**: Commit & Push
+3. **Attendi 2 min**: Portainer fa auto-deploy
+
+### **🔧 Per Riavviare:**
+1. **Raspberry Pi**: Si avvia tutto automaticamente  
+2. **Se serve**: `sudo docker ps` → `sudo docker restart omniaproject-be`
+3. **Test**: `curl -X POST http://192.168.1.100:3000/api/led/toggle`
+
 ---
 **Ultimo aggiornamento: 2025-09-06**  
-**Sistema: Ubuntu 24.04 + Docker + Spring Boot + GPIO**
+**Sistema: Ubuntu 24.04 + Docker + Portainer + Spring Boot + GPIO + React Frontend**  
+**Status: ✅ SISTEMA COMPLETO E FUNZIONANTE**

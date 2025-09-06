@@ -1,28 +1,151 @@
 package com.omnia.raspberry.controller;
 
 import com.omnia.raspberry.service.GpioService;
+import com.omnia.raspberry.service.SystemMonitorService;
+import com.omnia.raspberry.model.GpioPin;
+import com.omnia.raspberry.model.SystemInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "*")
-public class LedController {
+public class RaspberryPiController {
 
     @Autowired
     private GpioService gpioService;
 
+    @Autowired
+    private SystemMonitorService systemMonitorService;
+
     @GetMapping("/")
     public ResponseEntity<Map<String, Object>> getServerStatus() {
         Map<String, Object> response = new HashMap<>();
-        response.put("message", "🚀 OMNIA PROJECT - Auto-deploy ATTIVO!");
-        response.put("ledState", gpioService.isLedOn());
-        response.put("service", "Java Spring Boot + Pi4J");
+        response.put("message", "🚀 OMNIA PROJECT - Sistema GPIO Professionale");
+        response.put("version", "2.0.0");
+        response.put("service", "Spring Boot + GPIO Professional");
+        response.put("totalPins", gpioService.getAllGpioPins().size());
+        response.put("ledState", gpioService.isLedOn()); // Compatibilità
         return ResponseEntity.ok(response);
     }
+
+    // =================== NUOVE API GPIO ===================
+
+    @GetMapping("/api/gpio/pins")
+    public ResponseEntity<List<GpioPin>> getAllGpioPins() {
+        try {
+            List<GpioPin> pins = gpioService.getAllGpioPins();
+            return ResponseEntity.ok(pins);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/api/gpio/pin/{pinNumber}")
+    public ResponseEntity<GpioPin> getGpioPin(@PathVariable int pinNumber) {
+        try {
+            GpioPin pin = gpioService.getGpioPin(pinNumber);
+            if (pin != null) {
+                return ResponseEntity.ok(pin);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/api/gpio/pin/{pinNumber}/toggle")
+    public ResponseEntity<Map<String, Object>> toggleGpioPin(@PathVariable int pinNumber) {
+        try {
+            boolean newState = gpioService.toggleDigitalPin(pinNumber);
+            GpioPin pin = gpioService.getGpioPin(pinNumber);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("pinNumber", pinNumber);
+            response.put("name", pin != null ? pin.getName() : "Pin " + pinNumber);
+            response.put("isOn", newState);
+            response.put("message", "Pin " + pinNumber + " " + (newState ? "attivato" : "disattivato"));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore controllo pin " + pinNumber + ": " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =================== CONTROLLO VENTOLA ===================
+
+    @PostMapping("/api/fan/speed")
+    public ResponseEntity<Map<String, Object>> setFanSpeed(@RequestParam int percentage) {
+        try {
+            gpioService.setFanSpeed(percentage);
+            Map<String, Object> response = new HashMap<>();
+            response.put("fanSpeed", percentage);
+            response.put("message", "Ventola impostata al " + percentage + "%");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore controllo ventola: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =================== LED STRIP WS2812B ===================
+
+    @PostMapping("/api/ledstrip/color")
+    public ResponseEntity<Map<String, Object>> setLedStripColor(
+            @RequestParam int ledIndex,
+            @RequestParam int red,
+            @RequestParam int green,
+            @RequestParam int blue) {
+        try {
+            gpioService.setLedStripColor(ledIndex, red, green, blue);
+            Map<String, Object> response = new HashMap<>();
+            response.put("ledIndex", ledIndex);
+            response.put("color", Map.of("red", red, "green", green, "blue", blue));
+            response.put("message", "LED " + ledIndex + " impostato a RGB(" + red + "," + green + "," + blue + ")");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore controllo LED strip: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =================== MONITORAGGIO SISTEMA ===================
+
+    @GetMapping("/api/system/info")
+    public ResponseEntity<SystemInfo> getSystemInfo() {
+        try {
+            SystemInfo systemInfo = systemMonitorService.getSystemInfo();
+            return ResponseEntity.ok(systemInfo);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/api/system/temperature")
+    public ResponseEntity<Map<String, Object>> getSystemTemperature() {
+        try {
+            SystemInfo systemInfo = systemMonitorService.getSystemInfo();
+            Map<String, Object> response = new HashMap<>();
+            response.put("temperature", systemInfo.getCpuTemperature());
+            response.put("unit", "°C");
+            response.put("status", systemInfo.getCpuTemperature() > 70 ? "HOT" : "OK");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore lettura temperatura: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =================== API COMPATIBILITÀ (per frontend esistente) ===================
 
     @PostMapping("/api/led/toggle")
     public ResponseEntity<Map<String, Object>> toggleLed() {

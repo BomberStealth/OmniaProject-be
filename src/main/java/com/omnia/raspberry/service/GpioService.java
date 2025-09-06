@@ -1,87 +1,290 @@
 package com.omnia.raspberry.service;
 
+import com.omnia.raspberry.model.GpioPin;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.util.*;
 
 @Service
 public class GpioService {
 
-    private boolean ledState = false;
-    private static final int LED_PIN = 18;
+    private Map<Integer, GpioPin> gpioPins = new HashMap<>();
+    
+    // Configurazione GPIO Pins
+    private static final int LED_PIN = 18;           // LED semplice
+    private static final int WS2812B_PIN = 19;      // LED Strip WS2812B
+    private static final int FAN_PWM_PIN = 12;      // Ventola PWM
+    private static final int RELAY_1_PIN = 16;      // Relè 1
+    private static final int RELAY_2_PIN = 20;      // Relè 2
+    private static final int PIR_SENSOR_PIN = 21;   // Sensore movimento
+    private static final int BUZZER_PIN = 26;       // Buzzer
+    private static final int STATUS_LED_PIN = 13;   // LED stato sistema
 
     @PostConstruct
     public void initialize() {
         try {
-            // Inizializza LED spento
-            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
-            ledState = false;
-            System.out.println("GPIO Service inizializzato con gpioset. LED pin: " + LED_PIN);
+            initializeGpioPins();
+            System.out.println("🚀 GPIO Service Professional inizializzato con " + gpioPins.size() + " pin configurati");
         } catch (Exception e) {
-            System.err.println("Errore nell'inizializzazione GPIO: " + e.getMessage());
+            System.err.println("❌ Errore nell'inizializzazione GPIO: " + e.getMessage());
         }
+    }
+
+    private void initializeGpioPins() {
+        // =================== TUTTI I GPIO PIN RASPBERRY PI 4 ===================
+        
+        // GPIO pin controllabili digitalmente (tutti i pin GPIO disponibili)
+        int[] allGpioPins = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27};
+        
+        for (int gpioNum : allGpioPins) {
+            String pinName = "GPIO " + gpioNum;
+            String pinType = "DIGITAL";
+            String description = "Pin GPIO generico controllabile";
+            
+            // Configura pin speciali con nomi e tipi specifici
+            switch (gpioNum) {
+                case 2:
+                    pinName = "GPIO 2 (SDA)";
+                    pinType = "I2C";
+                    description = "I2C Data Line - Può essere usato come GPIO";
+                    break;
+                case 3:
+                    pinName = "GPIO 3 (SCL)";
+                    pinType = "I2C";
+                    description = "I2C Clock Line - Può essere usato come GPIO";
+                    break;
+                case 4:
+                    pinName = "GPIO 4";
+                    description = "GPIO generico - GPCLK0";
+                    break;
+                case 7:
+                    pinName = "GPIO 7 (CE1)";
+                    pinType = "SPI";
+                    description = "SPI Chip Enable 1 - Può essere usato come GPIO";
+                    break;
+                case 8:
+                    pinName = "GPIO 8 (CE0)";
+                    pinType = "SPI";
+                    description = "SPI Chip Enable 0 - Può essere usato come GPIO";
+                    break;
+                case 9:
+                    pinName = "GPIO 9 (MISO)";
+                    pinType = "SPI";
+                    description = "SPI Master In Slave Out - Può essere usato come GPIO";
+                    break;
+                case 10:
+                    pinName = "GPIO 10 (MOSI)";
+                    pinType = "SPI";
+                    description = "SPI Master Out Slave In - Può essere usato come GPIO";
+                    break;
+                case 11:
+                    pinName = "GPIO 11 (SCLK)";
+                    pinType = "SPI";
+                    description = "SPI Serial Clock - Può essere usato come GPIO";
+                    break;
+                case 12:
+                    pinName = "🌪️ Ventola PWM";
+                    pinType = "PWM";
+                    description = "Ventola di raffreddamento Raspberry Pi - PWM";
+                    break;
+                case 13:
+                    pinName = "💡 LED Status";
+                    description = "LED indicatore stato sistema";
+                    break;
+                case 14:
+                    pinName = "GPIO 14 (TXD)";
+                    pinType = "UART";
+                    description = "UART Transmit - Può essere usato come GPIO";
+                    break;
+                case 15:
+                    pinName = "GPIO 15 (RXD)";
+                    pinType = "UART";
+                    description = "UART Receive - Può essere usato come GPIO";
+                    break;
+                case 16:
+                    pinName = "🔌 Relè #1";
+                    description = "Controllo dispositivo esterno 1";
+                    break;
+                case 18:
+                    pinName = "🔆 LED Principale";
+                    description = "LED di controllo principale";
+                    break;
+                case 19:
+                    pinName = "🌈 LED Strip WS2812B";
+                    pinType = "ADDRESSABLE";
+                    description = "Striscia LED RGB indirizzabile (10 LED)";
+                    break;
+                case 20:
+                    pinName = "🔌 Relè #2";
+                    description = "Controllo dispositivo esterno 2";
+                    break;
+                case 21:
+                    pinName = "👁️ Sensore PIR";
+                    pinType = "INPUT";
+                    description = "Rilevatore di presenza PIR";
+                    break;
+                case 26:
+                    pinName = "🔊 Buzzer Allarme";
+                    description = "Sistema di allarme sonoro";
+                    break;
+            }
+            
+            gpioPins.put(gpioNum, new GpioPin(gpioNum, pinName, pinType, description));
+        }
+
+        // Inizializza tutti i pin GPIO
+        for (GpioPin pin : gpioPins.values()) {
+            String type = pin.getType();
+            if (!type.equals("INPUT")) {
+                try {
+                    executeCommand("gpioset gpiochip0 " + pin.getPinNumber() + "=0");
+                    pin.setState(false);
+                    System.out.println("✅ Pin " + pin.getPinNumber() + " (" + pin.getName() + ") inizializzato");
+                } catch (Exception e) {
+                    pin.setEnabled(false);
+                    System.err.println("⚠️ Pin " + pin.getPinNumber() + " non disponibile: " + e.getMessage());
+                }
+            } else {
+                // Pin di input - abilitato ma non controllabile in output
+                System.out.println("📌 Pin " + pin.getPinNumber() + " (" + pin.getName() + ") - INPUT");
+            }
+        }
+        
+        System.out.println("🚀 GPIO Service inizializzato con " + gpioPins.size() + " pin controllabili");
     }
 
     @PreDestroy
     public void cleanup() {
         try {
-            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
-            System.out.println("GPIO Service terminato correttamente");
+            // Spegni tutti i pin di output
+            for (GpioPin pin : gpioPins.values()) {
+                if (!pin.getType().equals("INPUT") && pin.isEnabled()) {
+                    executeCommand("gpioset gpiochip0 " + pin.getPinNumber() + "=0");
+                }
+            }
+            System.out.println("🔄 GPIO Service terminato correttamente");
         } catch (Exception e) {
-            System.err.println("Errore nella chiusura GPIO: " + e.getMessage());
+            System.err.println("❌ Errore nella chiusura GPIO: " + e.getMessage());
         }
     }
 
     private void executeCommand(String command) throws IOException, InterruptedException {
-        System.out.println("Executing GPIO command: " + command);
         Process process = Runtime.getRuntime().exec(command);
         int exitCode = process.waitFor();
-        System.out.println("Command exit code: " + exitCode);
         if (exitCode != 0) {
-            // Leggi stderr per debug
             String error = new String(process.getErrorStream().readAllBytes());
-            System.err.println("Command error output: " + error);
-            throw new IOException("Command failed with exit code: " + exitCode + ", error: " + error);
+            throw new IOException("Command failed: " + command + " - " + error);
         }
-        System.out.println("GPIO command executed successfully");
     }
 
-    public boolean toggleLed() {
-        try {
-            ledState = !ledState;
-            executeCommand("gpioset gpiochip0 " + LED_PIN + "=" + (ledState ? "1" : "0"));
-            System.out.println("LED: " + (ledState ? "ON" : "OFF"));
-            return ledState;
-        } catch (Exception e) {
-            System.err.println("Errore nel toggle LED: " + e.getMessage());
-            throw new RuntimeException("Errore nel controllo GPIO", e);
+    // API per ottenere tutti i pin GPIO
+    public List<GpioPin> getAllGpioPins() {
+        return new ArrayList<>(gpioPins.values());
+    }
+
+    // API per ottenere un pin specifico
+    public GpioPin getGpioPin(int pinNumber) {
+        return gpioPins.get(pinNumber);
+    }
+
+    // Toggle pin digitale
+    public boolean toggleDigitalPin(int pinNumber) {
+        GpioPin pin = gpioPins.get(pinNumber);
+        if (pin == null || !pin.isEnabled()) {
+            throw new RuntimeException("Pin " + pinNumber + " non valido o non disponibile");
         }
+        
+        if (pin.getType().equals("INPUT")) {
+            throw new RuntimeException("Pin " + pinNumber + " è configurato come INPUT - non controllabile");
+        }
+
+        try {
+            boolean newState = !pin.isState();
+            executeCommand("gpioset gpiochip0 " + pinNumber + "=" + (newState ? "1" : "0"));
+            pin.setState(newState);
+            System.out.println("🔄 Pin " + pinNumber + " (" + pin.getName() + "): " + (newState ? "ON" : "OFF"));
+            return newState;
+        } catch (Exception e) {
+            System.err.println("❌ Errore toggle pin " + pinNumber + ": " + e.getMessage());
+            throw new RuntimeException("Errore nel controllo GPIO pin " + pinNumber, e);
+        }
+    }
+
+    // Controllo PWM per ventola
+    public void setFanSpeed(int percentage) {
+        if (percentage < 0 || percentage > 100) {
+            throw new RuntimeException("Velocità ventola deve essere tra 0-100%");
+        }
+
+        GpioPin fanPin = gpioPins.get(FAN_PWM_PIN);
+        if (fanPin == null || !fanPin.isEnabled()) {
+            throw new RuntimeException("Ventola non disponibile");
+        }
+
+        try {
+            // Converti percentuale in valore PWM (0-255)
+            int pwmValue = (int) (percentage * 2.55);
+            fanPin.setPwmValue(pwmValue);
+            fanPin.setState(percentage > 0);
+            
+            // Per ora simula PWM con on/off, poi implementeremo PWM vero
+            if (percentage == 0) {
+                executeCommand("gpioset gpiochip0 " + FAN_PWM_PIN + "=0");
+            } else {
+                executeCommand("gpioset gpiochip0 " + FAN_PWM_PIN + "=1");
+            }
+            
+            System.out.println("🌪️ Ventola impostata al " + percentage + "% (PWM: " + pwmValue + ")");
+        } catch (Exception e) {
+            throw new RuntimeException("Errore controllo ventola", e);
+        }
+    }
+
+    // Controllo LED Strip WS2812B (da implementare)
+    public void setLedStripColor(int ledIndex, int red, int green, int blue) {
+        // TODO: Implementare controllo WS2812B
+        System.out.println("🌈 LED Strip[" + ledIndex + "] -> R:" + red + " G:" + green + " B:" + blue);
+        // Per ora aggiorna solo lo stato del pin
+        GpioPin stripPin = gpioPins.get(WS2812B_PIN);
+        if (stripPin != null) {
+            stripPin.setState(red > 0 || green > 0 || blue > 0);
+        }
+    }
+
+    // Lettura sensore PIR
+    public boolean readPirSensor() {
+        try {
+            // TODO: Implementare lettura GPIO input
+            System.out.println("👁️ Lettura sensore movimento PIR");
+            return false; // Placeholder
+        } catch (Exception e) {
+            throw new RuntimeException("Errore lettura sensore PIR", e);
+        }
+    }
+
+    // API di compatibilità per il LED semplice (mantengo per non rompere frontend)
+    public boolean toggleLed() {
+        return toggleDigitalPin(LED_PIN);
     }
 
     public void turnOnLed() {
-        try {
-            executeCommand("gpioset gpiochip0 " + LED_PIN + "=1");
-            ledState = true;
-            System.out.println("LED: ON");
-        } catch (Exception e) {
-            System.err.println("Errore nell'accensione LED: " + e.getMessage());
-            throw new RuntimeException("Errore nel controllo GPIO", e);
+        GpioPin pin = gpioPins.get(LED_PIN);
+        if (pin != null && !pin.isState()) {
+            toggleDigitalPin(LED_PIN);
         }
     }
 
     public void turnOffLed() {
-        try {
-            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
-            ledState = false;
-            System.out.println("LED: OFF");
-        } catch (Exception e) {
-            System.err.println("Errore nello spegnimento LED: " + e.getMessage());
-            throw new RuntimeException("Errore nel controllo GPIO", e);
+        GpioPin pin = gpioPins.get(LED_PIN);
+        if (pin != null && pin.isState()) {
+            toggleDigitalPin(LED_PIN);
         }
     }
 
     public boolean isLedOn() {
-        return ledState;
+        GpioPin pin = gpioPins.get(LED_PIN);
+        return pin != null ? pin.isState() : false;
     }
 }
