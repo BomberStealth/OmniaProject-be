@@ -1,74 +1,51 @@
 package com.omnia.raspberry.service;
 
-import com.pi4j.Pi4J;
-import com.pi4j.context.Context;
-import com.pi4j.io.gpio.digital.DigitalOutput;
-import com.pi4j.io.gpio.digital.DigitalState;
 import org.springframework.stereotype.Service;
-
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.io.IOException;
 
 @Service
 public class GpioService {
 
-    private Context pi4j;
-    private DigitalOutput led;
     private boolean ledState = false;
-    
-    // Pin GPIO per il LED (BCM 18, Physical Pin 12)
     private static final int LED_PIN = 18;
 
     @PostConstruct
     public void initialize() {
         try {
-            //Prova
-            // Inizializza Pi4J context
-            pi4j = Pi4J.newAutoContext();
-            
-            // Configura il pin del LED come output
-            led = pi4j.dout().create(LED_PIN);
-            
             // Inizializza LED spento
-            led.low();
+            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
             ledState = false;
-            
-            System.out.println("GPIO Service inizializzato. LED pin: " + LED_PIN);
+            System.out.println("GPIO Service inizializzato con gpioset. LED pin: " + LED_PIN);
         } catch (Exception e) {
             System.err.println("Errore nell'inizializzazione GPIO: " + e.getMessage());
-            // Su sistemi non-Raspberry Pi, continua senza GPIO reale
         }
     }
 
     @PreDestroy
     public void cleanup() {
         try {
-            if (led != null) {
-                led.low();
-            }
-            if (pi4j != null) {
-                pi4j.shutdown();
-            }
+            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
             System.out.println("GPIO Service terminato correttamente");
         } catch (Exception e) {
             System.err.println("Errore nella chiusura GPIO: " + e.getMessage());
         }
     }
 
+    private void executeCommand(String command) throws IOException, InterruptedException {
+        Process process = Runtime.getRuntime().exec(command);
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IOException("Command failed with exit code: " + exitCode);
+        }
+    }
+
     public boolean toggleLed() {
         try {
-            if (led != null) {
-                ledState = !ledState;
-                if (ledState) {
-                    led.high();
-                } else {
-                    led.low();
-                }
-            } else {
-                // Modalità simulazione per test su PC
-                ledState = !ledState;
-                System.out.println("LED simulato: " + (ledState ? "ON" : "OFF"));
-            }
+            ledState = !ledState;
+            executeCommand("gpioset gpiochip0 " + LED_PIN + "=" + (ledState ? "1" : "0"));
+            System.out.println("LED: " + (ledState ? "ON" : "OFF"));
             return ledState;
         } catch (Exception e) {
             System.err.println("Errore nel toggle LED: " + e.getMessage());
@@ -78,12 +55,9 @@ public class GpioService {
 
     public void turnOnLed() {
         try {
-            if (led != null) {
-                led.high();
-            } else {
-                System.out.println("LED simulato: ON");
-            }
+            executeCommand("gpioset gpiochip0 " + LED_PIN + "=1");
             ledState = true;
+            System.out.println("LED: ON");
         } catch (Exception e) {
             System.err.println("Errore nell'accensione LED: " + e.getMessage());
             throw new RuntimeException("Errore nel controllo GPIO", e);
@@ -92,12 +66,9 @@ public class GpioService {
 
     public void turnOffLed() {
         try {
-            if (led != null) {
-                led.low();
-            } else {
-                System.out.println("LED simulato: OFF");
-            }
+            executeCommand("gpioset gpiochip0 " + LED_PIN + "=0");
             ledState = false;
+            System.out.println("LED: OFF");
         } catch (Exception e) {
             System.err.println("Errore nello spegnimento LED: " + e.getMessage());
             throw new RuntimeException("Errore nel controllo GPIO", e);
