@@ -18,7 +18,7 @@ public class LedController {
     @GetMapping("/")
     public ResponseEntity<Map<String, Object>> getServerStatus() {
         Map<String, Object> response = new HashMap<>();
-        response.put("message", "🚀 OMNIA PROJECT - Auto-deploy funziona!");
+        response.put("message", "🚀 OMNIA PROJECT - Auto-deploy ATTIVO!");
         response.put("ledState", gpioService.isLedOn());
         response.put("service", "Java Spring Boot + Pi4J");
         return ResponseEntity.ok(response);
