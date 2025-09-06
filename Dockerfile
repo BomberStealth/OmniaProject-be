@@ -1,5 +1,5 @@
 # Multi-stage build per ottimizzare l'immagine finale
-FROM openjdk:17-jdk-slim AS builder
+FROM eclipse-temurin:17-jdk AS builder
 
 # Installa Maven
 RUN apt-get update && apt-get install -y maven
@@ -20,13 +20,15 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage finale - runtime
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jre
 
-# Installa pigpio per Pi4J (necessario per GPIO su Raspberry Pi)
+# Installa gpiod tools per controllo GPIO
 RUN apt-get update && \
-    apt-get install -y pigpio && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y \
+        curl \
+        gpiod \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Crea directory di lavoro
 WORKDIR /app
@@ -37,5 +39,5 @@ COPY --from=builder /app/target/raspberry-controller-1.0.0.jar app.jar
 # Espone la porta 3000
 EXPOSE 3000
 
-# Avvia pigpiod daemon e l'applicazione
-CMD ["sh", "-c", "pigpiod && java -jar app.jar"]
+# Avvia l'applicazione
+CMD ["java", "-jar", "app.jar"]
