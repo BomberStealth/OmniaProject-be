@@ -34,11 +34,17 @@ public class GpioService {
     }
 
     private void executeCommand(String command) throws IOException, InterruptedException {
+        System.out.println("Executing GPIO command: " + command);
         Process process = Runtime.getRuntime().exec(command);
         int exitCode = process.waitFor();
+        System.out.println("Command exit code: " + exitCode);
         if (exitCode != 0) {
-            throw new IOException("Command failed with exit code: " + exitCode);
+            // Leggi stderr per debug
+            String error = new String(process.getErrorStream().readAllBytes());
+            System.err.println("Command error output: " + error);
+            throw new IOException("Command failed with exit code: " + exitCode + ", error: " + error);
         }
+        System.out.println("GPIO command executed successfully");
     }
 
     public boolean toggleLed() {
