@@ -8,6 +8,8 @@ public class GpioPin {
     private int pwmValue; // 0-255 per PWM
     private String description;
     private boolean enabled;
+    private int brightness; // 0-255 per LED brightness
+    private String effect; // per LED Strip effects (static, breathe, rainbow, strobe)
 
     public GpioPin(int pinNumber, String name, String type, String description) {
         this.pinNumber = pinNumber;
@@ -17,6 +19,8 @@ public class GpioPin {
         this.state = false;
         this.pwmValue = 0;
         this.enabled = true;
+        this.brightness = 255;
+        this.effect = "static";
     }
 
     // Getters and Setters
@@ -40,4 +44,10 @@ public class GpioPin {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public int getBrightness() { return brightness; }
+    public void setBrightness(int brightness) { this.brightness = brightness; }
+
+    public String getEffect() { return effect; }
+    public void setEffect(String effect) { this.effect = effect; }
 }

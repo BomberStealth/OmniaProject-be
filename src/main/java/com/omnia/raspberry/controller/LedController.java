@@ -117,6 +117,58 @@ public class RaspberryPiController {
         }
     }
 
+    @PostMapping("/api/ledstrip/power")
+    public ResponseEntity<Map<String, Object>> setLedStripPower(@RequestParam boolean isOn) {
+        try {
+            gpioService.setLedStripPower(isOn);
+            Map<String, Object> response = new HashMap<>();
+            response.put("isOn", isOn);
+            response.put("message", "LED Strip " + (isOn ? "accesa" : "spenta"));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore controllo alimentazione LED strip: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @PostMapping("/api/ledstrip/brightness")
+    public ResponseEntity<Map<String, Object>> setLedStripBrightness(@RequestParam int brightness) {
+        try {
+            gpioService.setLedStripBrightness(brightness);
+            Map<String, Object> response = new HashMap<>();
+            response.put("brightness", brightness);
+            response.put("message", "Luminosità LED Strip impostata a " + brightness);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore controllo luminosità LED strip: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @PostMapping("/api/ledstrip/effect")
+    public ResponseEntity<Map<String, Object>> setLedStripEffect(
+            @RequestParam String effect,
+            @RequestParam(defaultValue = "50") int speed,
+            @RequestParam(defaultValue = "255") int red,
+            @RequestParam(defaultValue = "255") int green,
+            @RequestParam(defaultValue = "255") int blue) {
+        try {
+            gpioService.setLedStripEffect(effect, speed, red, green, blue);
+            Map<String, Object> response = new HashMap<>();
+            response.put("effect", effect);
+            response.put("speed", speed);
+            response.put("color", Map.of("red", red, "green", green, "blue", blue));
+            response.put("message", "Effetto LED Strip '" + effect + "' attivato");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Errore effetto LED strip: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
     // =================== MONITORAGGIO SISTEMA ===================
 
     @GetMapping("/api/system/info")

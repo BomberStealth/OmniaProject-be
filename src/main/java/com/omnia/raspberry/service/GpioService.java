@@ -244,12 +244,90 @@ public class GpioService {
 
     // Controllo LED Strip WS2812B (da implementare)
     public void setLedStripColor(int ledIndex, int red, int green, int blue) {
-        // TODO: Implementare controllo WS2812B
+        // TODO: Implementare controllo WS2812B con libreria Python
         System.out.println("🌈 LED Strip[" + ledIndex + "] -> R:" + red + " G:" + green + " B:" + blue);
         // Per ora aggiorna solo lo stato del pin
         GpioPin stripPin = gpioPins.get(WS2812B_PIN);
         if (stripPin != null) {
             stripPin.setState(red > 0 || green > 0 || blue > 0);
+        }
+    }
+
+    // Controllo alimentazione LED Strip
+    public void setLedStripPower(boolean isOn) {
+        GpioPin stripPin = gpioPins.get(WS2812B_PIN);
+        if (stripPin == null || !stripPin.isEnabled()) {
+            throw new RuntimeException("LED Strip non disponibile");
+        }
+
+        try {
+            if (isOn) {
+                // TODO: Implementare accensione LED Strip con colore precedente
+                System.out.println("🌈 LED Strip accesa");
+            } else {
+                // TODO: Spegnere tutti i LED della strip
+                System.out.println("🌈 LED Strip spenta");
+            }
+            stripPin.setState(isOn);
+        } catch (Exception e) {
+            throw new RuntimeException("Errore controllo alimentazione LED Strip", e);
+        }
+    }
+
+    // Controllo luminosità LED Strip
+    public void setLedStripBrightness(int brightness) {
+        if (brightness < 0 || brightness > 255) {
+            throw new RuntimeException("Luminosità deve essere tra 0-255");
+        }
+
+        GpioPin stripPin = gpioPins.get(WS2812B_PIN);
+        if (stripPin == null || !stripPin.isEnabled()) {
+            throw new RuntimeException("LED Strip non disponibile");
+        }
+
+        try {
+            // TODO: Implementare controllo luminosità WS2812B
+            System.out.println("🌈 LED Strip luminosità impostata a " + brightness);
+            stripPin.setBrightness(brightness);
+        } catch (Exception e) {
+            throw new RuntimeException("Errore controllo luminosità LED Strip", e);
+        }
+    }
+
+    // Controllo effetti LED Strip
+    public void setLedStripEffect(String effect, int speed, int red, int green, int blue) {
+        GpioPin stripPin = gpioPins.get(WS2812B_PIN);
+        if (stripPin == null || !stripPin.isEnabled()) {
+            throw new RuntimeException("LED Strip non disponibile");
+        }
+
+        // Validazione effetti
+        String[] validEffects = {"static", "breathe", "rainbow", "strobe"};
+        boolean validEffect = Arrays.stream(validEffects).anyMatch(effect::equalsIgnoreCase);
+        if (!validEffect) {
+            throw new RuntimeException("Effetto non valido. Disponibili: " + Arrays.toString(validEffects));
+        }
+
+        try {
+            // TODO: Implementare effetti WS2812B
+            switch (effect.toLowerCase()) {
+                case "static":
+                    System.out.println("🌈 LED Strip - Effetto statico RGB(" + red + "," + green + "," + blue + ")");
+                    break;
+                case "breathe":
+                    System.out.println("🌈 LED Strip - Effetto respiro RGB(" + red + "," + green + "," + blue + ") velocità:" + speed);
+                    break;
+                case "rainbow":
+                    System.out.println("🌈 LED Strip - Effetto arcobaleno velocità:" + speed);
+                    break;
+                case "strobe":
+                    System.out.println("🌈 LED Strip - Effetto strobo RGB(" + red + "," + green + "," + blue + ") velocità:" + speed);
+                    break;
+            }
+            stripPin.setEffect(effect);
+            stripPin.setState(true);
+        } catch (Exception e) {
+            throw new RuntimeException("Errore impostazione effetto LED Strip", e);
         }
     }
 
