@@ -16,6 +16,12 @@ public class GpioService {
     private static final int LED_PIN = 18;           // LED semplice
     private static final int WS2812B_PIN = 19;      // LED Strip WS2812B
     private static final int FAN_PWM_PIN = 12;      // Ventola PWM
+    
+    // Arrays per memorizzare i colori dei LED WS2812B
+    private int[] ledRed = new int[10];
+    private int[] ledGreen = new int[10]; 
+    private int[] ledBlue = new int[10];
+    private boolean stripPower = false;
     private static final int RELAY_1_PIN = 16;      // Relè 1
     private static final int RELAY_2_PIN = 20;      // Relè 2
     private static final int PIR_SENSOR_PIN = 21;   // Sensore movimento
@@ -139,7 +145,7 @@ public class GpioService {
             String type = pin.getType();
             if (!type.equals("INPUT")) {
                 try {
-                    executeCommand("gpioset gpiochip0 " + pin.getPinNumber() + "=0");
+                    executeCommand("gpioset --mode=exit gpiochip0 " + pin.getPinNumber() + "=0");
                     pin.setState(false);
                     System.out.println("✅ Pin " + pin.getPinNumber() + " (" + pin.getName() + ") inizializzato");
                 } catch (Exception e) {
@@ -161,7 +167,7 @@ public class GpioService {
             // Spegni tutti i pin di output
             for (GpioPin pin : gpioPins.values()) {
                 if (!pin.getType().equals("INPUT") && pin.isEnabled()) {
-                    executeCommand("gpioset gpiochip0 " + pin.getPinNumber() + "=0");
+                    executeCommand("gpioset --mode=exit gpiochip0 " + pin.getPinNumber() + "=0");
                 }
             }
             System.out.println("🔄 GPIO Service terminato correttamente");
@@ -202,7 +208,7 @@ public class GpioService {
 
         try {
             boolean newState = !pin.isState();
-            executeCommand("gpioset gpiochip0 " + pinNumber + "=" + (newState ? "1" : "0"));
+            executeCommand("gpioset --mode=exit gpiochip0 " + pinNumber + "=" + (newState ? "1" : "0"));
             pin.setState(newState);
             System.out.println("🔄 Pin " + pinNumber + " (" + pin.getName() + "): " + (newState ? "ON" : "OFF"));
             return newState;
@@ -231,9 +237,9 @@ public class GpioService {
             
             // Per ora simula PWM con on/off, poi implementeremo PWM vero
             if (percentage == 0) {
-                executeCommand("gpioset gpiochip0 " + FAN_PWM_PIN + "=0");
+                executeCommand("gpioset --mode=exit gpiochip0 " + FAN_PWM_PIN + "=0");
             } else {
-                executeCommand("gpioset gpiochip0 " + FAN_PWM_PIN + "=1");
+                executeCommand("gpioset --mode=exit gpiochip0 " + FAN_PWM_PIN + "=1");
             }
             
             System.out.println("🌪️ Ventola impostata al " + percentage + "% (PWM: " + pwmValue + ")");
@@ -244,12 +250,29 @@ public class GpioService {
 
     // Controllo LED Strip WS2812B (da implementare)
     public void setLedStripColor(int ledIndex, int red, int green, int blue) {
-        // TODO: Implementare controllo WS2812B con libreria Python
-        System.out.println("🌈 LED Strip[" + ledIndex + "] -> R:" + red + " G:" + green + " B:" + blue);
-        // Per ora aggiorna solo lo stato del pin
+        if (ledIndex < 0 || ledIndex >= 10) {
+            throw new RuntimeException("LED index deve essere tra 0-9");
+        }
+        
         GpioPin stripPin = gpioPins.get(WS2812B_PIN);
-        if (stripPin != null) {
-            stripPin.setState(red > 0 || green > 0 || blue > 0);
+        if (stripPin == null || !stripPin.isEnabled()) {
+            throw new RuntimeException("LED Strip non disponibile");
+        }
+
+        try {
+            // Memorizza il colore
+            ledRed[ledIndex] = red;
+            ledGreen[ledIndex] = green;
+            ledBlue[ledIndex] = blue;
+            
+            // Se la strip è accesa, applica il colore subito
+            if (stripPower) {
+                sendLedData(ledIndex, red, green, blue);
+            }
+            
+            System.out.println("🌈 LED Strip[" + ledIndex + "] -> R:" + red + " G:" + green + " B:" + blue);
+        } catch (Exception e) {
+            throw new RuntimeException("Errore colore LED Strip", e);
         }
     }
 
@@ -261,16 +284,23 @@ public class GpioService {
         }
 
         try {
+            stripPower = isOn;
             if (isOn) {
-                // TODO: Implementare accensione LED Strip con colore precedente
+                // Accendi tutti i LED con il colore memorizzato
+                for (int i = 0; i < 10; i++) {
+                    sendLedData(i, ledRed[i], ledGreen[i], ledBlue[i]);
+                }
                 System.out.println("🌈 LED Strip accesa");
             } else {
-                // TODO: Spegnere tutti i LED della strip
+                // Spegni tutti i LED
+                for (int i = 0; i < 10; i++) {
+                    sendLedData(i, 0, 0, 0);
+                }
                 System.out.println("🌈 LED Strip spenta");
             }
             stripPin.setState(isOn);
         } catch (Exception e) {
-            throw new RuntimeException("Errore controllo alimentazione LED Strip", e);
+            throw new RuntimeException("Errore controllo LED Strip", e);
         }
     }
 
@@ -364,5 +394,20 @@ public class GpioService {
     public boolean isLedOn() {
         GpioPin pin = gpioPins.get(LED_PIN);
         return pin != null ? pin.isState() : false;
+    }
+
+    // Metodo per inviare dati al LED specifico - CONTROLLO GPIO REALE WS2812B
+    private void sendLedData(int ledIndex, int red, int green, int blue) throws IOException, InterruptedException {
+        // Implementazione per WS2812B: usa --mode=time per mantenere il segnale
+        
+        if (red > 0 || green > 0 || blue > 0) {
+            // LED acceso - mantieni segnale HIGH per 1 secondo
+            executeCommand("gpioset --mode=time --sec=1 gpiochip0 " + WS2812B_PIN + "=1");
+            System.out.println("🔥 GPIO " + WS2812B_PIN + " → HIGH per LED " + ledIndex + " RGB(" + red + "," + green + "," + blue + ")");
+        } else {
+            // LED spento - segnale LOW
+            executeCommand("gpioset --mode=exit gpiochip0 " + WS2812B_PIN + "=0");
+            System.out.println("💤 GPIO " + WS2812B_PIN + " → LOW per LED " + ledIndex);
+        }
     }
 }

@@ -10,6 +10,7 @@ services:
       - JAVA_OPTS=-Xmx256m
     volumes:
       - /sys:/sys:rw
+      - /dev:/dev:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/led/status"]
       interval: 30s
