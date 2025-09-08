@@ -14,7 +14,7 @@ public class GpioService {
     
     // Configurazione GPIO Pins
     private static final int LED_PIN = 18;           // LED semplice
-    private static final int WS2812B_PIN = 19;      // LED Strip WS2812B
+    private static final int WS2812B_PIN = 18;      // LED Strip WS2812B (Hardware PWM)
     private static final int FAN_PWM_PIN = 12;      // Ventola PWM
     
     // Arrays per memorizzare i colori dei LED WS2812B
