@@ -2,6 +2,7 @@ package com.omnia.raspberry.service;
 
 import com.omnia.raspberry.model.GpioPin;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
@@ -9,6 +10,9 @@ import java.util.*;
 
 @Service
 public class GpioService {
+
+    @Autowired
+    private ESP01Service esp01Service;
 
     private Map<Integer, GpioPin> gpioPins = new HashMap<>();
     
@@ -254,9 +258,25 @@ public class GpioService {
             throw new RuntimeException("LED index deve essere tra 0-9");
         }
         
+        // Prova prima ESP-01S se disponibile
+        if (esp01Service != null && esp01Service.isAvailable()) {
+            System.out.println("🌐 Usando ESP-01S per controllo LED " + ledIndex);
+            boolean success = esp01Service.setLedColor(ledIndex, red, green, blue);
+            if (success) {
+                // Memorizza il colore anche localmente
+                ledRed[ledIndex] = red;
+                ledGreen[ledIndex] = green;
+                ledBlue[ledIndex] = blue;
+                return;
+            } else {
+                System.out.println("⚠️ ESP-01S fallito, usando GPIO diretto");
+            }
+        }
+        
+        // Fallback a GPIO diretto se ESP-01S non disponibile
         GpioPin stripPin = gpioPins.get(WS2812B_PIN);
         if (stripPin == null || !stripPin.isEnabled()) {
-            throw new RuntimeException("LED Strip non disponibile");
+            throw new RuntimeException("LED Strip non disponibile (né ESP-01S né GPIO)");
         }
 
         try {
@@ -278,9 +298,22 @@ public class GpioService {
 
     // Controllo alimentazione LED Strip
     public void setLedStripPower(boolean isOn) {
+        // Prova prima ESP-01S se disponibile
+        if (esp01Service != null && esp01Service.isAvailable()) {
+            System.out.println("🌐 Usando ESP-01S per power LED Strip: " + (isOn ? "ON" : "OFF"));
+            boolean success = esp01Service.setLedStripPower(isOn);
+            if (success) {
+                stripPower = isOn;
+                return;
+            } else {
+                System.out.println("⚠️ ESP-01S fallito, usando GPIO diretto");
+            }
+        }
+        
+        // Fallback a GPIO diretto
         GpioPin stripPin = gpioPins.get(WS2812B_PIN);
         if (stripPin == null || !stripPin.isEnabled()) {
-            throw new RuntimeException("LED Strip non disponibile");
+            throw new RuntimeException("LED Strip non disponibile (né ESP-01S né GPIO)");
         }
 
         try {
